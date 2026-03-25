@@ -91,7 +91,7 @@ void DiscordTargetManager::discoverTargets() {
 		ensureTargetExists(pipeName);
 	}
 
-	bool targetsChanged = false;
+	bool didTargetsChange = false;
 	bool activeSessionChanged = false;
 
 	for(auto it = targets_.begin(), end = targets_.end(); it != end; ++it) {
@@ -101,7 +101,7 @@ void DiscordTargetManager::discoverTargets() {
 
 		if(target.isAvailable != isAvailable) {
 			target.isAvailable = isAvailable;
-			targetsChanged = true;
+			didTargetsChange = true;
 			if(target.id == activeTargetId_)
 				activeSessionChanged = true;
 		}
@@ -113,7 +113,7 @@ void DiscordTargetManager::discoverTargets() {
 			const QString disconnectedError = QStringLiteral("DISCONNECTED");
 			if(target.lastError != disconnectedError) {
 				target.lastError = disconnectedError;
-				targetsChanged = true;
+				didTargetsChange = true;
 			}
 			continue;
 		}
@@ -125,7 +125,7 @@ void DiscordTargetManager::discoverTargets() {
 			const QString missingCredentials = QStringLiteral("ERR 0");
 			if(target.lastError != missingCredentials) {
 				target.lastError = missingCredentials;
-				targetsChanged = true;
+				didTargetsChange = true;
 			}
 			continue;
 		}
@@ -140,7 +140,7 @@ void DiscordTargetManager::discoverTargets() {
 			|| previousTarget.cachedUser.username != target.cachedUser.username
 			|| previousTarget.cachedUser.avatarID != target.cachedUser.avatarID
 			|| previousTarget.lastError != target.lastError) {
-			targetsChanged = true;
+			didTargetsChange = true;
 			if(target.id == activeTargetId_)
 				activeSessionChanged = true;
 		}
@@ -149,7 +149,7 @@ void DiscordTargetManager::discoverTargets() {
 	if(activeTargetId_.isEmpty() && !availableTargets.isEmpty())
 		setActiveTargetId(firstAvailableTargetId());
 
-	if(targetsChanged)
+	if(didTargetsChange)
 		emit targetsChanged();
 	if(activeSessionChanged)
 		emit activeSessionStateChanged();
