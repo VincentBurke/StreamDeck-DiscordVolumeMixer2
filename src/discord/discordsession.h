@@ -43,6 +43,10 @@ public:
 		return currentVoiceChannelID_;
 	}
 
+	inline bool isInVoiceChannel() const {
+		return !currentVoiceChannelID_.isEmpty();
+	}
+
 	inline const QMap<QString, VoiceChannelMember> &voiceChannelMembers() const {
 		return voiceChannelMembers_;
 	}

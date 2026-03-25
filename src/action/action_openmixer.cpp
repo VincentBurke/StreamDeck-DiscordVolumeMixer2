@@ -5,22 +5,32 @@
 #include "dvmplugin.h"
 
 namespace {
-QString targetStatusLabel(const DiscordTarget &target) {
+QString targetStateLabel(const DiscordTarget &target) {
 	if(!target.isAvailable)
 		return "Closed";
 
-	if(!target.lastError.isEmpty())
-		return target.lastError;
+	if(target.isInVoiceChannel)
+		return "In VC";
 
-	return "Connected";
+	return "Idle";
 }
 
-QString targetComboLabel(const DiscordTarget &target, const QString &activeTargetId) {
+QString targetStatusLabel(const DiscordTarget &target) {
+	const QString stateLabel = targetStateLabel(target);
+	if(target.isAvailable && !target.lastError.isEmpty())
+		return QStringLiteral("%1 (%2)").arg(stateLabel, target.lastError);
+
+	return stateLabel;
+}
+
+QString targetComboLabel(const DiscordTarget &target, const QString &activeTargetId, const QString &primaryTargetId) {
 	QString label = target.displayName;
 	if(!target.cachedUser.username.isEmpty() && target.cachedUser.username != target.displayName)
 		label += QStringLiteral(" [%1]").arg(target.cachedUser.username);
 
 	label += QStringLiteral(" (%1)").arg(target.pipeName);
+	if(target.id == primaryTargetId)
+		label += " - Primary";
 	if(target.id == activeTargetId)
 		label += " - Active";
 
@@ -49,12 +59,16 @@ void Action_OpenMixer::update() {
 void Action_OpenMixer::buildPropertyInspector(QStreamDeckPropertyInspectorBuilder &b) {
 	const QList<DiscordTarget> targets = plugin()->targets();
 	const QString activeTargetId = plugin()->activeTargetId();
+	const QString primaryTargetId = plugin()->primaryTargetId();
 
 	b.addSection("Discord credentials");
 	b.addLineEdit("client_id", "Client ID").linkWithGlobalSetting();
 	b.addLineEdit("client_secret", "Client secret").linkWithGlobalSetting();
 	b.addMessage("Shared credentials are reused for every discovered Discord target.");
 	b.addMessage("For setup instructions, see the <a href=\"javascript: openUrl('https://github.com/CZDanol/StreamDeck-DiscordVolumeMixer2');\">GitHub page</a>.");
+
+	b.addSection("Automatic selection");
+	b.addMessage("The plugin follows whichever account is currently in voice chat. If multiple accounts are in voice chat, the primary target wins.");
 
 	b.addSection("Mixer target");
 	b.addComboBox("targetRoutingMode", "Routing", {
@@ -71,15 +85,15 @@ void Action_OpenMixer::buildPropertyInspector(QStreamDeckPropertyInspectorBuilde
 	QStringList targetItems;
 	targetItems.reserve(targets.size());
 	for(const DiscordTarget &target : targets)
-		targetItems += targetComboLabel(target, activeTargetId);
+		targetItems += targetComboLabel(target, activeTargetId, primaryTargetId);
 
 	{
-		auto &activeCombo = b.addComboBox("activeTargetSelector", "Active target", targetItems);
-		activeCombo.setValue(qMax(targetIndexForId(targets, activeTargetId), 0));
-		activeCombo.addValueChangedCallback([plugin = plugin(), targets](const QVariant &value) {
+		auto &primaryCombo = b.addComboBox("primaryTargetSelector", "Primary target", targetItems);
+		primaryCombo.setValue(qMax(targetIndexForId(targets, primaryTargetId), 0));
+		primaryCombo.addValueChangedCallback([plugin = plugin(), targets](const QVariant &value) {
 			const int index = value.toInt();
 			if(index >= 0 && index < targets.size())
-				plugin->setActiveTarget(targets[index].id);
+				plugin->setPrimaryTarget(targets[index].id);
 		});
 	}
 
@@ -96,6 +110,7 @@ void Action_OpenMixer::buildPropertyInspector(QStreamDeckPropertyInspectorBuilde
 	if(const DiscordTarget *activeTarget = plugin()->target(activeTargetId)) {
 		QStringList summary{
 			QStringLiteral("Active target: %1").arg(activeTarget->displayName),
+			QStringLiteral("Primary target: %1").arg(plugin()->targetDisplayName(primaryTargetId)),
 			QStringLiteral("Pipe: %1").arg(activeTarget->pipeName),
 			QStringLiteral("Status: %1").arg(targetStatusLabel(*activeTarget)),
 		};
@@ -115,7 +130,7 @@ void Action_OpenMixer::buildPropertyInspector(QStreamDeckPropertyInspectorBuilde
 
 		QStringList targetInfo{
 			QStringLiteral("Shown as: %1").arg(target.displayName),
-			QStringLiteral("Status: %1").arg(targetStatusLabel(target)),
+			QStringLiteral("State: %1").arg(targetStatusLabel(target)),
 		};
 		if(!target.cachedUser.username.isEmpty())
 			targetInfo += QStringLiteral("Authenticated account: %1").arg(target.cachedUser.username);

@@ -18,5 +18,6 @@ struct DiscordTarget {
 	QString displayName;
 	DiscordUserSummary cachedUser;
 	bool isAvailable = false;
+	bool isInVoiceChannel = false;
 	QString lastError;
 };

@@ -44,8 +44,14 @@ DVMPlugin::DVMPlugin() {
 		emit buttonsUpdateRequested();
 	});
 	connect(&targetManager_, &DiscordTargetManager::activeTargetChanged, this, [this](const QString &targetId) {
+		if(globalSetting("active_target_id").toString() != targetId)
+			setGlobalSetting("active_target_id", targetId);
 		emit activeTargetChanged(targetId);
 		emit buttonsUpdateRequested();
+	});
+	connect(&targetManager_, &DiscordTargetManager::primaryTargetChanged, this, [this](const QString &targetId) {
+		if(globalSetting("primary_target_id").toString() != targetId)
+			setGlobalSetting("primary_target_id", targetId);
 	});
 	connect(&targetManager_, &DiscordTargetManager::activeSessionStateChanged, this, &DVMPlugin::buttonsUpdateRequested);
 
@@ -81,20 +87,31 @@ QString DVMPlugin::activeTargetId() const {
 	return targetManager_.activeTargetId();
 }
 
+QString DVMPlugin::primaryTargetId() const {
+	return targetManager_.primaryTargetId();
+}
+
 bool DVMPlugin::setActiveTarget(const QString &targetId) {
 	if(targetId.isEmpty())
 		return false;
 
 	targetManager_.setActiveTargetId(targetId);
-	setGlobalSetting("active_target_id", targetId);
-	return true;
+	targetManager_.updateAutoActiveTarget();
+	return targetManager_.activeTargetId() == targetId;
+}
+
+bool DVMPlugin::setPrimaryTarget(const QString &targetId) {
+	if(targetId.isEmpty())
+		return false;
+
+	targetManager_.setPrimaryTargetId(targetId);
+	return targetManager_.primaryTargetId() == targetId;
 }
 
 bool DVMPlugin::activateFirstAvailableTarget() {
 	if(!targetManager_.activateFirstAvailableTarget())
 		return false;
 
-	setGlobalSetting("active_target_id", targetManager_.activeTargetId());
 	return true;
 }
 
@@ -124,9 +141,13 @@ QString DVMPlugin::targetDisplayName(const QString &targetId) const {
 QString DVMPlugin::resolveMixerTarget(const QString &pinnedTargetId, bool usePinnedTarget) {
 	if(usePinnedTarget && !pinnedTargetId.isEmpty()) {
 		setActiveTarget(pinnedTargetId);
-		return pinnedTargetId;
+		return activeTargetId();
 	}
 
+	if(!activeTargetId().isEmpty())
+		return activeTargetId();
+
+	targetManager_.updateAutoActiveTarget();
 	if(!activeTargetId().isEmpty())
 		return activeTargetId();
 
@@ -208,6 +229,7 @@ void DVMPlugin::adjustVoiceChannelMemberVolume(VoiceChannelMember &vcm, float st
 void DVMPlugin::syncTargetManagerSettingsFromGlobals() {
 	targetManager_.setStoredTargetLabels(globalSetting("target_labels").toObject());
 	targetManager_.setActiveTargetId(globalSetting("active_target_id").toString());
+	targetManager_.setPrimaryTargetId(globalSetting("primary_target_id").toString());
 	targetManager_.setSharedCredentials(globalSetting("client_id").toString(), globalSetting("client_secret").toString());
 }
 

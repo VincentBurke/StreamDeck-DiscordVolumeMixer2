@@ -19,9 +19,11 @@ public:
 	void setSharedCredentials(const QString &clientID, const QString &clientSecret);
 	void setStoredTargetLabels(const QJsonObject &labels);
 	void setActiveTargetId(const QString &targetId);
+	void setPrimaryTargetId(const QString &targetId);
 	bool activateFirstAvailableTarget();
 	void setTargetLabel(const QString &targetId, const QString &label);
 	void discoverTargets();
+	void updateAutoActiveTarget();
 
 public:
 	QList<DiscordTarget> targets() const;
@@ -31,10 +33,12 @@ public:
 	QString firstAvailableTargetId() const;
 	QString targetLabel(const QString &targetId) const;
 	QString activeTargetId() const;
+	QString primaryTargetId() const;
 
 signals:
 	void targetsChanged();
 	void activeTargetChanged(const QString &targetId);
+	void primaryTargetChanged(const QString &targetId);
 	void activeSessionStateChanged();
 
 private:
@@ -43,6 +47,8 @@ private:
 	QString resolvedDisplayName(const DiscordTarget &target) const;
 	void syncTargetFromSession(const QString &targetId);
 	bool probePipe(const QString &pipeName) const;
+	bool isTargetConnected(const QString &targetId) const;
+	bool isTargetInVoiceChannel(const QString &targetId) const;
 
 private:
 	QMap<QString, DiscordTarget> targets_;
@@ -51,5 +57,6 @@ private:
 	QString clientID_;
 	QString clientSecret_;
 	QString activeTargetId_;
+	QString primaryTargetId_;
 	QTimer discoveryTimer_;
 };

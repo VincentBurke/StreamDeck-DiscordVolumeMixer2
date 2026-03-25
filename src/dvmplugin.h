@@ -28,7 +28,9 @@ public:
 	QList<DiscordTarget> targets() const;
 	const DiscordTarget *target(const QString &targetId) const;
 	QString activeTargetId() const;
+	QString primaryTargetId() const;
 	bool setActiveTarget(const QString &targetId);
+	bool setPrimaryTarget(const QString &targetId);
 	bool activateFirstAvailableTarget();
 	void setTargetDisplayName(const QString &targetId, const QString &label);
 	QString targetLabel(const QString &targetId) const;

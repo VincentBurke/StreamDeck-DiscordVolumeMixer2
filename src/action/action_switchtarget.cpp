@@ -65,6 +65,7 @@ void Action_SwitchTarget::buildPropertyInspector(QStreamDeckPropertyInspectorBui
 		"Previous available target",
 		"Specific target",
 	}).linkWithActionSetting();
+	b.addMessage("Manual switching is temporary. Voice-chat selection wins immediately if another target is currently chosen by the automatic rules.");
 
 	if(targets.isEmpty()) {
 		b.addMessage("No Discord targets discovered yet. Open Discord or Discord Canary to make target switching available.");
@@ -90,6 +91,7 @@ void Action_SwitchTarget::buildPropertyInspector(QStreamDeckPropertyInspectorBui
 	if(const DiscordTarget *activeTarget = plugin()->target(plugin()->activeTargetId())) {
 		b.addMessage(QStringList{
 			QStringLiteral("Current active target: %1").arg(activeTarget->displayName),
+			QStringLiteral("Primary target: %1").arg(plugin()->targetDisplayName(plugin()->primaryTargetId())),
 			QStringLiteral("Pipe: %1").arg(activeTarget->pipeName),
 		});
 	}
@@ -102,6 +104,7 @@ void Action_SwitchTarget::onInitialized() {
 
 	connect(plugin(), &DVMPlugin::targetsChanged, this, &QStreamDeckAction::updatePropertyInspector);
 	connect(plugin(), &DVMPlugin::activeTargetChanged, this, &QStreamDeckAction::updatePropertyInspector);
+	connect(plugin(), &DVMPlugin::globalSettingsChanged, this, &QStreamDeckAction::updatePropertyInspector);
 }
 
 void Action_SwitchTarget::onPressed() {

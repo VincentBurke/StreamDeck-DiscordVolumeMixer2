@@ -53,6 +53,18 @@ void DiscordTargetManager::setActiveTargetId(const QString &targetId) {
 	emit activeSessionStateChanged();
 }
 
+void DiscordTargetManager::setPrimaryTargetId(const QString &targetId) {
+	if(!targetId.isEmpty())
+		ensureTargetExists(targetId);
+
+	if(primaryTargetId_ == targetId)
+		return;
+
+	primaryTargetId_ = targetId;
+	emit primaryTargetChanged(primaryTargetId_);
+	updateAutoActiveTarget();
+}
+
 bool DiscordTargetManager::activateFirstAvailableTarget() {
 	const QString targetId = firstAvailableTargetId();
 	if(targetId.isEmpty())
@@ -139,6 +151,7 @@ void DiscordTargetManager::discoverTargets() {
 			|| previousTarget.cachedUser.userID != target.cachedUser.userID
 			|| previousTarget.cachedUser.username != target.cachedUser.username
 			|| previousTarget.cachedUser.avatarID != target.cachedUser.avatarID
+			|| previousTarget.isInVoiceChannel != target.isInVoiceChannel
 			|| previousTarget.lastError != target.lastError) {
 			didTargetsChange = true;
 			if(target.id == activeTargetId_)
@@ -146,13 +159,50 @@ void DiscordTargetManager::discoverTargets() {
 		}
 	}
 
-	if(activeTargetId_.isEmpty() && !availableTargets.isEmpty())
-		setActiveTargetId(firstAvailableTargetId());
+	updateAutoActiveTarget();
 
 	if(didTargetsChange)
 		emit targetsChanged();
 	if(activeSessionChanged)
 		emit activeSessionStateChanged();
+}
+
+void DiscordTargetManager::updateAutoActiveTarget() {
+	if(primaryTargetId_.isEmpty()) {
+		const QString defaultPrimaryTargetId = firstAvailableTargetId();
+		if(!defaultPrimaryTargetId.isEmpty()) {
+			primaryTargetId_ = defaultPrimaryTargetId;
+			emit primaryTargetChanged(primaryTargetId_);
+		}
+	}
+
+	QStringList voiceTargets;
+	for(auto it = targets_.cbegin(), end = targets_.cend(); it != end; ++it) {
+		if(isTargetInVoiceChannel(it.key()))
+			voiceTargets += it.key();
+	}
+
+	QString resolvedTargetId = activeTargetId_;
+	if(voiceTargets.size() == 1) {
+		resolvedTargetId = voiceTargets.first();
+	}
+	else if(voiceTargets.size() > 1) {
+		if(voiceTargets.contains(primaryTargetId_))
+			resolvedTargetId = primaryTargetId_;
+		else if(voiceTargets.contains(activeTargetId_))
+			resolvedTargetId = activeTargetId_;
+		else
+			resolvedTargetId = voiceTargets.first();
+	}
+	else if(resolvedTargetId.isEmpty()) {
+		if(isTargetConnected(primaryTargetId_) || (target(primaryTargetId_) && target(primaryTargetId_)->isAvailable))
+			resolvedTargetId = primaryTargetId_;
+		else
+			resolvedTargetId = firstAvailableTargetId();
+	}
+
+	if(!resolvedTargetId.isEmpty())
+		setActiveTargetId(resolvedTargetId);
 }
 
 QList<DiscordTarget> DiscordTargetManager::targets() const {
@@ -189,6 +239,10 @@ QString DiscordTargetManager::activeTargetId() const {
 	return activeTargetId_;
 }
 
+QString DiscordTargetManager::primaryTargetId() const {
+	return primaryTargetId_;
+}
+
 void DiscordTargetManager::ensureTargetExists(const QString &targetId) {
 	if(targets_.contains(targetId))
 		return;
@@ -202,6 +256,7 @@ void DiscordTargetManager::ensureTargetExists(const QString &targetId) {
 	auto *targetSession = new DiscordSession(targetId, targetId, this);
 	connect(targetSession, &DiscordSession::stateChanged, this, [this, targetId] {
 		syncTargetFromSession(targetId);
+		updateAutoActiveTarget();
 		emit targetsChanged();
 		if(targetId == activeTargetId_)
 			emit activeSessionStateChanged();
@@ -239,6 +294,7 @@ void DiscordTargetManager::syncTargetFromSession(const QString &targetId) {
 	if(const DiscordUserSummary user = targetSession->userSummary(); user.isValid())
 		target.cachedUser = user;
 
+	target.isInVoiceChannel = targetSession->isInVoiceChannel();
 	target.lastError = targetSession->connectionError();
 	target.displayName = resolvedDisplayName(target);
 }
@@ -251,4 +307,18 @@ bool DiscordTargetManager::probePipe(const QString &pipeName) const {
 		socket.disconnectFromServer();
 
 	return connected;
+}
+
+bool DiscordTargetManager::isTargetConnected(const QString &targetId) const {
+	DiscordSession *targetSession = session(targetId);
+	return targetSession && targetSession->isConnected();
+}
+
+bool DiscordTargetManager::isTargetInVoiceChannel(const QString &targetId) const {
+	const DiscordTarget *discordTarget = target(targetId);
+	if(!discordTarget || !discordTarget->isAvailable)
+		return false;
+
+	DiscordSession *targetSession = session(targetId);
+	return targetSession && targetSession->isConnected() && targetSession->isInVoiceChannel();
 }
