@@ -58,7 +58,7 @@ This is a plugin for Stream Deck for managing Discord Voice chats:
 	* Check if there are not multiple profiles for "Discord Volume Mixer". If yes, remove them all and try again.
 
 ## Configuration
-1. Download and install the plugin from the Stream Deck Marketplace (preferred, handles auto updates) or from [the releases](https://github.com/CZDanol/StreamDeck-DiscordVolumeMixer2/releases).
+1. Download and install the plugin from the Stream Deck Marketplace (preferred, handles auto updates) or from [the releases](https://github.com/VincentBurke/StreamDeck-DiscordVolumeMixer2/releases).
 2. Add the "Discord Volume Mixer" button on your deck.
 3. Go to the [Discord developer portal](https://discordapp.com/developers) (if the link asks you for login and then shows the Discord app, close the window and click this link again) and create an application.
 	 * Use the account that owns the app, or add your other Discord accounts as app testers.

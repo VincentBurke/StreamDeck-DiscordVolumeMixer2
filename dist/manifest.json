@@ -210,8 +210,8 @@
   "CategoryIcon": "icons/icons8_discord_new_72px",
   "Name": "Discord Volume Mixer",
   "Icon": "icons/icons8_discord_new_72px",
-  "URL": "https://github.com/CZDanol/StreamDeck-DiscordVolumeMixer2",
-  "Version": "2.0.1.9",
+  "URL": "https://github.com/VincentBurke/StreamDeck-DiscordVolumeMixer2",
+  "Version": "2.1.0",
   "Profiles": [
     {
       "Name": "Discord Volume Mixer",
