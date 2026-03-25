@@ -25,7 +25,7 @@ auto computeParams(Action_VCMPaging &b) {
 	if(!step)
 		return R{};
 
-	const int pageCount = static_cast<int>(b.plugin()->voiceChannelMembers.size() + step - 1) / step;
+	const int pageCount = static_cast<int>(b.plugin()->voiceChannelMembers().size() + step - 1) / step;
 	return R{
 		.pageCount = pageCount,
 		.currentPage = b.device()->voiceChannelMemberIndexOffset / step,

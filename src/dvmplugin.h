@@ -1,12 +1,13 @@
 #pragma once
 
 #include <qtstreamdeck2/qstreamdeckplugin.h>
-#include <qtdiscordipc/qdiscord.h>
-#include <QSettings>
+#include <QImage>
+#include <QSet>
 
 #include "declares.h"
-#include "voicechannelmember.h"
+#include "discord/discordtargetmanager.h"
 #include "dvmdevice.h"
+#include "voicechannelmember.h"
 
 class DVMPlugin : public QStreamDeckPluginT<DVMDevice> {
 Q_OBJECT
@@ -16,46 +17,49 @@ public:
 	~DVMPlugin();
 
 public slots:
-	/// Attempts to connect to Discord
+	/// Attempts to discover targets and connect the active one.
 	void connectToDiscord();
 
-	/// Reloads all channel member data
+	/// Reloads channel member data for the active target.
 	void updateChannelMembersData();
 
 public:
-	/// Processes voice state update for the user itself
-	void updateSelfVoiceState(const QDiscordMessage &msg);
+	DiscordSession *activeSession() const;
+	QList<DiscordTarget> targets() const;
+	const DiscordTarget *target(const QString &targetId) const;
+	QString activeTargetId() const;
+	bool setActiveTarget(const QString &targetId);
+	bool activateFirstAvailableTarget();
+	void setTargetDisplayName(const QString &targetId, const QString &label);
+	QString targetDisplayName(const QString &targetId) const;
+	QString resolveMixerTarget(const QString &pinnedTargetId, bool usePinnedTarget);
+	QString activeConnectionError() const;
+	bool isDiscordConnected() const;
+	QImage userAvatar(const QString &userId, const QString &avatarId) const;
+
+public:
+	const QMap<QString, VoiceChannelMember> &voiceChannelMembers() const;
+	QMap<QString, VoiceChannelMember> *activeVoiceChannelMembers();
+	const QSet<QString> &speakingVoiceChannelMembers() const;
+	bool isDeafened() const;
+	bool isMicrophoneMuted() const;
 
 	void adjustVoiceChannelMemberVolume(VoiceChannelMember &vcm, float stepSize, int numSteps);
-
-public:
-	QDiscord discord;
-
-public:
-	QString currentVoiceChannelID;
-	QMap<QString, VoiceChannelMember> voiceChannelMembers;
-	QSet<QString> speakingVoiceChannelMembers;
-
-	int voiceChannelMemberIxOffset = 0;
-
-public:
-	bool isDeafened = false;
-	bool isMicrophoneMuted = false;
 
 signals:
 	/// Updates text & states of all user related buttons
 	void buttonsUpdateRequested();
+	void targetsChanged();
+	void activeTargetChanged(const QString &targetId);
 
 private:
-	void updateCurrentVoiceChannel(const QString &newVoiceChannel);
+	void syncTargetManagerSettingsFromGlobals();
 
 private slots:
 	void onInitialized();
-	void onDiscordMessageReceived(const QDiscordMessage &msg);
 	void onStreamDeckEventReceived(const QStreamDeckEvent &e);
 
 private:
+	DiscordTargetManager targetManager_;
 	QTimer discordConnectTimeoutTimer_;
-	QTimer discordReconnectTimer_;
-
 };

@@ -16,7 +16,18 @@ void VoiceChannelMemberAction::onInitialized() {
 }
 
 VoiceChannelMemberAction::VoiceChannelMemberResult VoiceChannelMemberAction::voiceChannelMember() {
-	auto &lst = plugin()->voiceChannelMembers;
+	QMap<QString, VoiceChannelMember> *members = plugin()->activeVoiceChannelMembers();
+	if(!members)
+		return {};
+
+	auto &lst = *members;
+	if(lst.isEmpty()) {
+		device()->voiceChannelMemberIndexOffset = 0;
+		return {};
+	}
+
+	if(device()->voiceChannelMemberIndexOffset >= lst.size())
+		device()->voiceChannelMemberIndexOffset = 0;
 
 	QString userID = setting("user_ix").toString();
 

@@ -8,16 +8,15 @@ Action_Microphone::Action_Microphone() {
 }
 
 void Action_Microphone::update() {
-	if(const int newState = plugin()->isMicrophoneMuted; state_ != newState) {
+	if(const int newState = plugin()->isMicrophoneMuted(); state_ != newState) {
 		state_ = newState;
 		setState(newState);
 	}
 }
 
 void Action_Microphone::onPressed() {
-	plugin()->isMicrophoneMuted ^= true;
-	plugin()->discord.sendCommand(+QDiscord::CommandType::setVoiceSettings, {{"mute", plugin()->isMicrophoneMuted}});
-	emit plugin()->buttonsUpdateRequested();
+	if(DiscordSession *session = plugin()->activeSession())
+		session->setMicrophoneMuted(!session->isMicrophoneMuted());
 }
 
 void Action_Microphone::onReleased() {

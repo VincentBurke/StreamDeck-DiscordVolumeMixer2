@@ -26,17 +26,17 @@ void Action_VCMInfo::update_button() {
 	const auto vcmp = voiceChannelMember();
 	const VoiceChannelMember &vcm = vcmp ? *vcmp.mem : VoiceChannelMember::null;
 
-	const bool isSpeaking = vcmp && plugin()->speakingVoiceChannelMembers.contains(vcm.userID);
+	const bool isSpeaking = vcmp && plugin()->speakingVoiceChannelMembers().contains(vcm.userID);
 
 	const QString volumeStr = vcm.isMuted ? "MUTED" : QStringLiteral("%1 %").arg(QString::number(vcm.volume));
 
 	{
 		QString newTitle;
-		if(!plugin()->discord.isConnected())
-			newTitle = plugin()->discord.connectionError();
+		if(!plugin()->isDiscordConnected())
+			newTitle = plugin()->activeConnectionError();
 		else if(vcmp)
 			newTitle = QStringLiteral("%1\n%3\n%2").arg(vcm.nick, volumeStr, isSpeaking ? ">>SPEAKING<<" : vcm.isMuted ? "##" : "");
-		else if(plugin()->voiceChannelMembers.isEmpty() && !plugin()->globalSetting("hideNobodyInVoiceChatText").toBool())
+		else if(plugin()->voiceChannelMembers().isEmpty() && !plugin()->globalSetting("hideNobodyInVoiceChatText").toBool())
 			newTitle = QString("NOBODY\nIN\nVOICE CHAT");
 
 		if(title_ != newTitle) {
@@ -49,7 +49,7 @@ void Action_VCMInfo::update_button() {
 	if(userID_ != newUserId || !hasAvatar_) {
 		userID_ = newUserId;
 
-		const QImage avatar = plugin()->discord.getUserAvatar(userID_, vcm.avatarID);
+		const QImage avatar = plugin()->userAvatar(userID_, vcm.avatarID);
 		hasAvatar_ = !avatar.isNull();
 
 		QImage img(72, 72, QImage::Format_ARGB32);
@@ -78,21 +78,21 @@ void Action_VCMInfo::update_encoder() {
 	const auto vcmp = voiceChannelMember();
 	const VoiceChannelMember &vcm = vcmp ? *vcmp.mem : VoiceChannelMember::null;
 
-	const bool isSpeaking = vcmp && plugin()->speakingVoiceChannelMembers.contains(vcm.userID);
+	const bool isSpeaking = vcmp && plugin()->speakingVoiceChannelMembers().contains(vcm.userID);
 
 	QJsonObject feedbackData;
 
 	{
 		QString newTitle;
-		if(!plugin()->discord.isConnected())
-			newTitle = plugin()->discord.connectionError();
+		if(!plugin()->isDiscordConnected())
+			newTitle = plugin()->activeConnectionError();
 		else if(vcmp) {
 			if(setting("showPaging").toBool())
-				newTitle += QStringLiteral("%1/%2 ").arg(QString::number(vcmp.userIndex + 1), QString::number(plugin()->voiceChannelMembers.size()));
+				newTitle += QStringLiteral("%1/%2 ").arg(QString::number(vcmp.userIndex + 1), QString::number(plugin()->voiceChannelMembers().size()));
 
 			newTitle += vcm.nick;
 		}
-		else if(plugin()->voiceChannelMembers.isEmpty() && !plugin()->globalSetting("hideNobodyInVoiceChatText").toBool())
+		else if(plugin()->voiceChannelMembers().isEmpty() && !plugin()->globalSetting("hideNobodyInVoiceChatText").toBool())
 			newTitle = QString("NOBODY IN VOICE");
 
 		if(newTitle != title_) {
@@ -113,7 +113,7 @@ void Action_VCMInfo::update_encoder() {
 	if(userID_ != newUserId || !hasAvatar_) {
 		userID_ = newUserId;
 
-		const QImage avatar = plugin()->discord.getUserAvatar(userID_, vcm.avatarID);
+		const QImage avatar = plugin()->userAvatar(userID_, vcm.avatarID);
 		hasAvatar_ = !avatar.isNull();
 
 		QImage img(48, 48, QImage::Format_ARGB32);
@@ -185,26 +185,23 @@ void Action_VCMInfo::executeAction(Action_VCMInfo::Action a) {
 			if(!vcmp)
 				return;
 
-			auto vcm = vcmp.mem;
-
-			vcm->isMuted ^= true;
-
-			plugin()->discord.sendCommand(+QDiscord::CommandType::setUserVoiceSettings, QJsonObject{
-				{"user_id", vcm->userID},
-				{"mute",    vcm->isMuted},
-			});
-			emit plugin()->buttonsUpdateRequested();
+			if(DiscordSession *session = plugin()->activeSession())
+				session->setVoiceChannelMemberMuted(*vcmp.mem, !vcmp.mem->isMuted);
 			break;
 		}
 
 		case Action::nextUser:
-			device()->voiceChannelMemberIndexOffset = (device()->voiceChannelMemberIndexOffset + 1) % plugin()->voiceChannelMembers.size();
-			emit plugin()->buttonsUpdateRequested();
+			if(!plugin()->voiceChannelMembers().isEmpty()) {
+				device()->voiceChannelMemberIndexOffset = (device()->voiceChannelMemberIndexOffset + 1) % plugin()->voiceChannelMembers().size();
+				emit plugin()->buttonsUpdateRequested();
+			}
 			break;
 
 		case Action::previousUser:
-			device()->voiceChannelMemberIndexOffset = (device()->voiceChannelMemberIndexOffset + plugin()->voiceChannelMembers.size() - 1) % plugin()->voiceChannelMembers.size();
-			emit plugin()->buttonsUpdateRequested();
+			if(!plugin()->voiceChannelMembers().isEmpty()) {
+				device()->voiceChannelMemberIndexOffset = (device()->voiceChannelMemberIndexOffset + plugin()->voiceChannelMembers().size() - 1) % plugin()->voiceChannelMembers().size();
+				emit plugin()->buttonsUpdateRequested();
+			}
 			break;
 
 		case Action::none:

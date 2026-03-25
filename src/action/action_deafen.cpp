@@ -8,17 +8,15 @@ Action_Deafen::Action_Deafen() {
 }
 
 void Action_Deafen::update() {
-	if(const int newState = plugin()->isDeafened; state_ != newState) {
+	if(const int newState = plugin()->isDeafened(); state_ != newState) {
 		state_ = newState;
 		setState(newState);
 	}
 }
 
 void Action_Deafen::onPressed() {
-	plugin()->isDeafened ^= true;
-	plugin()->isMicrophoneMuted |= plugin()->isDeafened;
-	plugin()->discord.sendCommand(+QDiscord::CommandType::setVoiceSettings, {{"deaf", plugin()->isDeafened}});
-	emit plugin()->buttonsUpdateRequested();
+	if(DiscordSession *session = plugin()->activeSession())
+		session->setDeafened(!session->isDeafened());
 }
 
 void Action_Deafen::onReleased() {
