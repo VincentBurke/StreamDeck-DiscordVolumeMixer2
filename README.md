@@ -9,6 +9,7 @@ This is a plugin for Stream Deck for managing Discord Voice chats:
 * You can **mute** each user by clicking on his name button.
 * **Indication** when a user is **speaking**.
 * **Self mute and deafen** buttons (deafen only on XL, mute on XL and STD)
+* Native multi-target support for multiple local Discord clients, including Discord Stable and Discord Canary.
 * Supports **Standard, Mini, XL, Mobile and SD+ Decks**.
 * You can adjust the audio mixer panel to your needs, it's quite modular - you can move buttons around etc.
 * Tested on W10x64.
@@ -23,21 +24,22 @@ This is a plugin for Stream Deck for managing Discord Voice chats:
 	* Try installing the [MSVC 2019 x64 runtime](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
 
 * `ERR 0`: Missing client ID/secret
-	* You haven't filled the credentials. See the Configuration section below.
+	* You haven't filled the shared credentials in the Open Mixer button settings. See the Configuration section below.
 
 * `ERR 1`: Could not connect to Discord
-	 * Check that the Discord app is running.
+	 * Check that at least one Discord client is running.
 	 * Check that the plugin is not blocked by firewall.
 	 * Check that you're not running Discord or the Stream Deck software under different privilleges (say as admin).
-	 * Try restarting the Discord.
+	 * Try restarting the Discord client you want to control.
 
 * `ERR 2`: Your credentials are wrong
 	* Check that you've configured everything properly on the Discord Developer Portal, it has to be exactly as in the screenshot in the Configuration section.
-	* Make sure that you're connected on the Discord with the same account you've used on the Discord Developer Portal.
+	* Make sure that the Discord account authorizing the target is allowed to use your app.
 	* Try resetting your Client secret in the Discord Developer Portal and putting a new one into the plugin.
-	* After everything, restart the Discord client.
+	* After everything, restart the Discord client and re-open the Open Mixer settings.
 
 * `ERR 4`: Double check that you're using the same account in the Discord App as in the Developer Portal.
+	* If you are using a second account, add it as an app tester and authenticate that target again.
 
 * `ERR 8`:
 	* Make sure your app in the Discord Developer Portal doesn't contain the word "Discord" in the name.
@@ -59,7 +61,7 @@ This is a plugin for Stream Deck for managing Discord Voice chats:
 1. Download and install the plugin from the Stream Deck Marketplace (preferred, handles auto updates) or from [the releases](https://github.com/CZDanol/StreamDeck-DiscordVolumeMixer2/releases).
 2. Add the "Discord Volume Mixer" button on your deck.
 3. Go to the [Discord developer portal](https://discordapp.com/developers) (if the link asks you for login and then shows the Discord app, close the window and click this link again) and create an application.
-	 * **You must use the same account in to the Developer portal as in your Discord application, otherwise it won't work.** (You can add the other account as app tester though.)
+	 * Use the account that owns the app, or add your other Discord accounts as app testers.
 	 * You're setting this stuff up for your own account, not for any bot or anything else.
 4. Create a new application. You can name it however you like, for example "DVM".
 	 * **Do not use "Discord" in the name of the app, [apparently the Discord doesn't like it.](https://github.com/CZDanol/StreamDeck-DiscordVolumeMixer2/issues/26)**
@@ -67,12 +69,18 @@ This is a plugin for Stream Deck for managing Discord Voice chats:
 7. Hit "Save changes".
 8. Under "OAuth2", add redirect to `http://localhost:1337/callback`
 9. Hit "Save changes".
-10. Copy `Client ID` and `Client secret` and paste it in your Discord Volume Mixer button settings (the button used to access the volume mixer).
+10. Copy `Client ID` and `Client secret` and paste them into the Open Mixer button settings.
 	 * If you don't see the client secret, but only the "Reset Secret" button, simply click on the button, it will give you a new secret.
-11. Click on the Discord Volume Mixer button. Discord will ask you for some permissions & firewall and stuff.
-12. Done.
+11. Start every Discord client you want to control, for example Discord Stable and Discord Canary.
+12. In the Open Mixer button settings:
+	* Pick the active target.
+	* Optionally rename each discovered target, for example `Main / Stable` and `Alt / Canary`.
+	* Choose whether that button follows the global active target or pins a specific target.
+13. Click on the Discord Volume Mixer button. Discord will ask each target to authorize separately the first time it is used.
+14. Optionally add the `Switch active target` action to your deck if you want to cycle targets directly from the hardware.
+15. Done.
 
-**Don't play with the configuration of the buttons in the Volume Mixer profile unless you know what you're doing.**
+**The buttons inside the mixer profile always follow the currently active target.**
 
 ![](etc/oauth.png)
 ![](etc/oauth2.png)
