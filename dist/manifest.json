@@ -168,15 +168,15 @@
       "UUID": "cz.danol.discordmixer.switchtarget"
     },
     {
-      "Icon": "icons/icons8_block_microphone_72px",
+      "Icon": "icons/dvm_mic_active_72px",
       "Name": "[DVM] Mute/unmute microphone",
       "States": [
         {
-          "Image": "icons/icons8_microphone_72px",
+          "Image": "icons/dvm_mic_active_72px",
           "ShowTitle": false
         },
         {
-          "Image": "icons/icons8_block_microphone_72px",
+          "Image": "icons/dvm_mic_muted_72px",
           "ShowTitle": false
         }
       ],
@@ -185,15 +185,15 @@
       "UUID": "cz.danol.discordmixer.microphone"
     },
     {
-      "Icon": "icons/icons8_no_audio_72px",
+      "Icon": "icons/dvm_headset_active_72px",
       "Name": "[DVM] Mute/unmute audio (deafen)",
       "States": [
         {
-          "Image": "icons/icons8_speaker_72px",
+          "Image": "icons/dvm_headset_active_72px",
           "ShowTitle": false
         },
         {
-          "Image": "icons/icons8_no_audio_72px",
+          "Image": "icons/dvm_headset_deafened_72px",
           "ShowTitle": false
         }
       ],
