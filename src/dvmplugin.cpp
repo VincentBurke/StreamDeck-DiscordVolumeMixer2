@@ -108,6 +108,10 @@ void DVMPlugin::setTargetDisplayName(const QString &targetId, const QString &lab
 	setGlobalSetting("target_labels", labels);
 }
 
+QString DVMPlugin::targetLabel(const QString &targetId) const {
+	return targetManager_.targetLabel(targetId);
+}
+
 QString DVMPlugin::targetDisplayName(const QString &targetId) const {
 	if(const DiscordTarget *target = this->target(targetId))
 		return target->displayName;

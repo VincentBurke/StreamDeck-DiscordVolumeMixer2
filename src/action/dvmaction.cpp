@@ -7,13 +7,11 @@
 DVMAction::DVMAction() {
 	connect(this, &QStreamDeckAction::initialized, this, &DVMAction::onInitialized);
 	connect(this, &QStreamDeckAction::settingsChanged, this, &DVMAction::update);
+	connect(this, &QStreamDeckAction::settingsChanged, this, &QStreamDeckAction::updatePropertyInspector);
 }
 
 void DVMAction::buildPropertyInspector(QStreamDeckPropertyInspectorBuilder &b) {
-	b.addSection("Discord settings");
-	b.addLineEdit("client_id", "Client ID").linkWithGlobalSetting();
-	b.addLineEdit("client_secret", "Client secret").linkWithGlobalSetting();
-	b.addMessage("For configuration instructions, see the <a href=\"javascript: openUrl('https://github.com/CZDanol/StreamDeck-DiscordVolumeMixer2');\">GitHub page</a>.");
+	Q_UNUSED(b);
 }
 
 void DVMAction::onInitialized() {

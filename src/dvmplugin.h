@@ -31,6 +31,7 @@ public:
 	bool setActiveTarget(const QString &targetId);
 	bool activateFirstAvailableTarget();
 	void setTargetDisplayName(const QString &targetId, const QString &label);
+	QString targetLabel(const QString &targetId) const;
 	QString targetDisplayName(const QString &targetId) const;
 	QString resolveMixerTarget(const QString &pinnedTargetId, bool usePinnedTarget);
 	QString activeConnectionError() const;
