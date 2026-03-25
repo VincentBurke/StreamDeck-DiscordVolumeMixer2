@@ -6,6 +6,7 @@
 #include "action/action_deafen.h"
 #include "action/action_microphone.h"
 #include "action/action_openmixer.h"
+#include "action/action_switchtarget.h"
 #include "action/action_vcminfo.h"
 #include "action/action_vcmpaging.h"
 #include "action/action_vcmvolume.h"
@@ -32,6 +33,7 @@ DVMPlugin::DVMPlugin() {
 	registerActionType<Action_Back>("cz.danol.discordmixer.back");
 	registerActionType<Action_Microphone>("cz.danol.discordmixer.microphone");
 	registerActionType<Action_Deafen>("cz.danol.discordmixer.deafen");
+	registerActionType<Action_SwitchTarget>("cz.danol.discordmixer.switchtarget");
 
 	connect(this, &QStreamDeckPlugin::initialized, this, &DVMPlugin::onInitialized);
 	connect(this, &QStreamDeckPlugin::eventReceived, this, &DVMPlugin::onStreamDeckEventReceived);

@@ -144,6 +144,30 @@
       "UUID": "cz.danol.discordmixer.previouspage"
     },
     {
+      "Icon": "icons/icons8_discord_new_72px",
+      "Name": "[DVM] Switch active target",
+      "States": [
+        {
+          "Image": "icons/icons8_discord_new_72px",
+          "ShowTitle": true,
+          "TitleAlignment": "middle",
+          "FontFamily": "Verdana",
+          "FontSize": "10"
+        },
+        {
+          "Image": "icons/noicon",
+          "ShowTitle": true,
+          "TitleAlignment": "middle",
+          "FontFamily": "Verdana",
+          "FontSize": "10"
+        }
+      ],
+      "UserTitleEnabled": false,
+      "Tooltip": "Switch the active Discord target",
+      "PropertyInspectorPath": "qtstreamdeck2/propertyinspector.html",
+      "UUID": "cz.danol.discordmixer.switchtarget"
+    },
+    {
       "Icon": "icons/icons8_block_microphone_72px",
       "Name": "[DVM] Mute/unmute microphone",
       "States": [
