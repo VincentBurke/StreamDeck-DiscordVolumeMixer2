@@ -74,7 +74,7 @@ Point repository URLs at the maintained GitHub repository and set the manifest v
 
 ```bash
 git add dist/manifest.json README.md
-git commit -m "chore: prepare v2.1.4 release"
+git commit -m "chore: prepare v2.1.5 release"
 ```
 
 ### Task 4: Push and publish
@@ -91,13 +91,13 @@ git push origin master
 **Step 2: Tag the release**
 
 ```bash
-git tag -a v2.1.4 -m "v2.1.4"
-git push origin v2.1.4
+git tag -a v2.1.5 -m "v2.1.5"
+git push origin v2.1.5
 ```
 
 **Step 3: Verify outputs**
 
 Expected:
 - the Windows workflow succeeds
-- a GitHub Release for `v2.1.4` exists
+- a GitHub Release for `v2.1.5` exists
 - the release contains a `.streamDeckPlugin` asset
