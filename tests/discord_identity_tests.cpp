@@ -125,7 +125,8 @@ void DiscordIdentityTests::storesAuthPerAccount() {
 	for(const QJsonObject &entry : authData)
 		accessTokens.insert(entry.value("access_token").toString());
 
-	QVERIFY(accessTokens == QSet<QString>{QString("token-a"), QString("token-b")});
+	const QSet<QString> expectedTokens{QString("token-a"), QString("token-b")};
+	QCOMPARE(accessTokens, expectedTokens);
 }
 
 QTEST_APPLESS_MAIN(DiscordIdentityTests)
