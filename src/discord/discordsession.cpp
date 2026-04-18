@@ -2,13 +2,13 @@
 
 #include <QJsonArray>
 
-DiscordSession::DiscordSession(const QString &targetId, const QString &pipeName, QObject *parent) :
+DiscordSession::DiscordSession(const QString &pipeName, QObject *parent) :
 	QObject(parent),
-	targetId_(targetId),
 	pipeName_(pipeName) {
 	connect(&discord_, &QDiscord::messageReceived, this, &DiscordSession::onDiscordMessageReceived);
 	connect(&discord_, &QDiscord::avatarReady, this, &DiscordSession::stateChanged);
 	connect(&discord_, &QDiscord::disconnected, this, [this] {
+		userSummary_ = {};
 		currentVoiceChannelID_.clear();
 		voiceChannelMembers_.clear();
 		speakingVoiceChannelMembers_.clear();
@@ -18,7 +18,11 @@ DiscordSession::DiscordSession(const QString &targetId, const QString &pipeName,
 	});
 }
 
-bool DiscordSession::ensureConnected(const QString &clientID, const QString &clientSecret, const QString &oauthDataPath) {
+bool DiscordSession::ensureConnected(
+	const QString &clientID,
+	const QString &clientSecret,
+	const QList<QJsonObject> &authCandidates,
+	bool allowInteractiveAuth) {
 	if(discord_.isConnected() || discord_.isProcessing())
 		return discord_.isConnected();
 
@@ -26,7 +30,8 @@ bool DiscordSession::ensureConnected(const QString &clientID, const QString &cli
 		.clientID = clientID,
 		.clientSecret = clientSecret,
 		.pipeName = pipeName_,
-		.oauthDataPath = oauthDataPath,
+		.authCandidates = authCandidates,
+		.allowInteractiveAuth = allowInteractiveAuth,
 	})) {
 		emit stateChanged();
 		return false;

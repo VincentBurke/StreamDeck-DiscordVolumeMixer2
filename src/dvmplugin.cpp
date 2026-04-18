@@ -21,6 +21,11 @@ const QSet<QString> &emptySpeakingMembers() {
 	static const QSet<QString> empty;
 	return empty;
 }
+
+bool shouldPersistTargetId(const QString &targetId) {
+	// Pipe-backed temporary ids are only valid for the current Discord process lifetime.
+	return !targetId.isEmpty() && !isTemporaryDiscordTargetId(targetId);
+}
 }
 
 DVMPlugin::DVMPlugin() {
@@ -44,13 +49,13 @@ DVMPlugin::DVMPlugin() {
 		emit buttonsUpdateRequested();
 	});
 	connect(&targetManager_, &DiscordTargetManager::activeTargetChanged, this, [this](const QString &targetId) {
-		if(globalSetting("active_target_id").toString() != targetId)
+		if(shouldPersistTargetId(targetId) && globalSetting("active_target_id").toString() != targetId)
 			setGlobalSetting("active_target_id", targetId);
 		emit activeTargetChanged(targetId);
 		emit buttonsUpdateRequested();
 	});
 	connect(&targetManager_, &DiscordTargetManager::primaryTargetChanged, this, [this](const QString &targetId) {
-		if(globalSetting("primary_target_id").toString() != targetId)
+		if(shouldPersistTargetId(targetId) && globalSetting("primary_target_id").toString() != targetId)
 			setGlobalSetting("primary_target_id", targetId);
 	});
 	connect(&targetManager_, &DiscordTargetManager::activeSessionStateChanged, this, &DVMPlugin::buttonsUpdateRequested);
@@ -62,8 +67,8 @@ DVMPlugin::DVMPlugin() {
 DVMPlugin::~DVMPlugin() {
 }
 
-void DVMPlugin::connectToDiscord() {
-	targetManager_.discoverTargets();
+void DVMPlugin::connectToDiscord(bool allowInteractiveAuth, const QString &preferredTargetId) {
+	targetManager_.discoverTargets(allowInteractiveAuth, preferredTargetId);
 }
 
 void DVMPlugin::updateChannelMembersData() {
@@ -116,14 +121,18 @@ bool DVMPlugin::activateFirstAvailableTarget() {
 }
 
 void DVMPlugin::setTargetDisplayName(const QString &targetId, const QString &label) {
+	const QString persistentTargetId = targetManager_.persistentTargetId(targetId);
+	if(persistentTargetId.isEmpty())
+		return;
+
 	QJsonObject labels = globalSetting("target_labels").toObject();
 	const QString trimmedLabel = label.trimmed();
 	if(trimmedLabel.isEmpty())
-		labels.remove(targetId);
+		labels.remove(persistentTargetId);
 	else
-		labels.insert(targetId, trimmedLabel);
+		labels.insert(persistentTargetId, trimmedLabel);
 
-	targetManager_.setTargetLabel(targetId, trimmedLabel);
+	targetManager_.setTargetLabel(persistentTargetId, trimmedLabel);
 	setGlobalSetting("target_labels", labels);
 }
 
@@ -136,6 +145,11 @@ QString DVMPlugin::targetDisplayName(const QString &targetId) const {
 		return target->displayName;
 
 	return targetId;
+}
+
+QString DVMPlugin::authorizeTarget(const QString &targetId) {
+	connectToDiscord(true, targetId);
+	return targetManager_.persistentTargetId(targetId);
 }
 
 QString DVMPlugin::resolveMixerTarget(const QString &pinnedTargetId, bool usePinnedTarget) {
@@ -258,5 +272,5 @@ void DVMPlugin::onStreamDeckEventReceived(const QStreamDeckEvent &e) {
 		return;
 
 	discordConnectTimeoutTimer_.start();
-	connectToDiscord();
+	connectToDiscord(true, activeTargetId());
 }

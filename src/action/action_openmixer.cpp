@@ -15,10 +15,17 @@ QString targetStateLabel(const DiscordTarget &target) {
 	return "Idle";
 }
 
+QString targetErrorLabel(const QString &error) {
+	if(error == "AUTH REQUIRED")
+		return "Needs auth";
+
+	return error;
+}
+
 QString targetStatusLabel(const DiscordTarget &target) {
 	const QString stateLabel = targetStateLabel(target);
 	if(target.isAvailable && !target.lastError.isEmpty())
-		return QStringLiteral("%1 (%2)").arg(stateLabel, target.lastError);
+		return QStringLiteral("%1 (%2)").arg(stateLabel, targetErrorLabel(target.lastError));
 
 	return stateLabel;
 }
@@ -92,8 +99,13 @@ void Action_OpenMixer::buildPropertyInspector(QStreamDeckPropertyInspectorBuilde
 		primaryCombo.setValue(qMax(targetIndexForId(targets, primaryTargetId), 0));
 		primaryCombo.addValueChangedCallback([plugin = plugin(), targets](const QVariant &value) {
 			const int index = value.toInt();
-			if(index >= 0 && index < targets.size())
-				plugin->setPrimaryTarget(targets[index].id);
+			if(index < 0 || index >= targets.size())
+				return;
+
+			const QString selectedId = targets[index].id;
+			const QString persistentTargetId = isTemporaryDiscordTargetId(selectedId) ? plugin->authorizeTarget(selectedId) : selectedId;
+			if(!persistentTargetId.isEmpty())
+				plugin->setPrimaryTarget(persistentTargetId);
 		});
 	}
 
@@ -102,8 +114,13 @@ void Action_OpenMixer::buildPropertyInspector(QStreamDeckPropertyInspectorBuilde
 		pinnedCombo.setValue(qMax(targetIndexForId(targets, setting("pinnedTargetId").toString()), 0));
 		pinnedCombo.addValueChangedCallback([action = this, targets](const QVariant &value) {
 			const int index = value.toInt();
-			if(index >= 0 && index < targets.size())
-				action->setSetting("pinnedTargetId", targets[index].id);
+			if(index < 0 || index >= targets.size())
+				return;
+
+			const QString selectedId = targets[index].id;
+			const QString persistentTargetId = isTemporaryDiscordTargetId(selectedId) ? action->plugin()->authorizeTarget(selectedId) : selectedId;
+			if(!persistentTargetId.isEmpty())
+				action->setSetting("pinnedTargetId", persistentTargetId);
 		});
 	}
 
@@ -122,11 +139,13 @@ void Action_OpenMixer::buildPropertyInspector(QStreamDeckPropertyInspectorBuilde
 
 	b.addSection("Target labels");
 	for(const DiscordTarget &target : targets) {
-		auto &labelInput = b.addLineEdit(QStringLiteral("targetLabel_%1").arg(target.id), target.pipeName);
-		labelInput.setValue(plugin()->targetLabel(target.id));
-		labelInput.addValueChangedCallback([plugin = plugin(), targetId = target.id](const QVariant &value) {
-			plugin->setTargetDisplayName(targetId, value.toString());
-		});
+		if(!isTemporaryDiscordTargetId(target.id)) {
+			auto &labelInput = b.addLineEdit(QStringLiteral("targetLabel_%1").arg(target.id), target.pipeName);
+			labelInput.setValue(plugin()->targetLabel(target.id));
+			labelInput.addValueChangedCallback([plugin = plugin(), targetId = target.id](const QVariant &value) {
+				plugin->setTargetDisplayName(targetId, value.toString());
+			});
+		}
 
 		QStringList targetInfo{
 			QStringLiteral("Shown as: %1").arg(target.displayName),
@@ -134,6 +153,8 @@ void Action_OpenMixer::buildPropertyInspector(QStreamDeckPropertyInspectorBuilde
 		};
 		if(!target.cachedUser.username.isEmpty())
 			targetInfo += QStringLiteral("Authenticated account: %1").arg(target.cachedUser.username);
+		else if(target.lastError == "AUTH REQUIRED")
+			targetInfo += QStringLiteral("Authorize this target once to make it persist by account.");
 
 		b.addMessage(targetInfo);
 	}
@@ -159,8 +180,11 @@ void Action_OpenMixer::onPressed() {
 		{+DT::streamDeckPlus,   "Discord Volume Mixer+"},
 	};
 
-	plugin()->resolveMixerTarget(setting("pinnedTargetId").toString(), setting("targetRoutingMode").toInt() == 1);
-	plugin()->connectToDiscord();
+	const QString targetId = plugin()->resolveMixerTarget(setting("pinnedTargetId").toString(), setting("targetRoutingMode").toInt() == 1);
+	if(const QString persistentTargetId = plugin()->authorizeTarget(targetId); !persistentTargetId.isEmpty())
+		plugin()->setActiveTarget(persistentTargetId);
+	else
+		plugin()->connectToDiscord(true, targetId);
 
 	device()->switchToProfile(profileNameByDeviceType.value(+device()->deviceType(), "Discord Volume Mixer"));
 	plugin()->updateChannelMembersData();

@@ -1,13 +1,13 @@
 #include "discordtargetmanager.h"
 
-#include <QDir>
 #include <QLocalSocket>
-#include <QStandardPaths>
 #include <QSet>
 
 DiscordTargetManager::DiscordTargetManager(QObject *parent) : QObject(parent) {
 	discoveryTimer_.setInterval(2500);
-	discoveryTimer_.callOnTimeout(this, &DiscordTargetManager::discoverTargets);
+	discoveryTimer_.callOnTimeout(this, [this] {
+		discoverTargets();
+	});
 	discoveryTimer_.start();
 }
 
@@ -24,27 +24,18 @@ void DiscordTargetManager::setStoredTargetLabels(const QJsonObject &labels) {
 	QHash<QString, QString> newLabels;
 	for(auto it = labels.begin(), end = labels.end(); it != end; ++it) {
 		const QString label = it.value().toString().trimmed();
-		if(label.isEmpty())
-			continue;
-
-		newLabels.insert(it.key(), label);
-		ensureTargetExists(it.key());
+		if(!label.isEmpty())
+			newLabels.insert(it.key(), label);
 	}
 
 	if(targetLabels_ == newLabels)
 		return;
 
 	targetLabels_ = newLabels;
-	for(auto it = targets_.begin(), end = targets_.end(); it != end; ++it)
-		it->displayName = resolvedDisplayName(it.value());
-
-	emit targetsChanged();
+	rebuildTargets();
 }
 
 void DiscordTargetManager::setActiveTargetId(const QString &targetId) {
-	if(!targetId.isEmpty())
-		ensureTargetExists(targetId);
-
 	if(activeTargetId_ == targetId)
 		return;
 
@@ -54,9 +45,6 @@ void DiscordTargetManager::setActiveTargetId(const QString &targetId) {
 }
 
 void DiscordTargetManager::setPrimaryTargetId(const QString &targetId) {
-	if(!targetId.isEmpty())
-		ensureTargetExists(targetId);
-
 	if(primaryTargetId_ == targetId)
 		return;
 
@@ -75,7 +63,8 @@ bool DiscordTargetManager::activateFirstAvailableTarget() {
 }
 
 void DiscordTargetManager::setTargetLabel(const QString &targetId, const QString &label) {
-	ensureTargetExists(targetId);
+	if(isTemporaryDiscordTargetId(targetId))
+		return;
 
 	const QString trimmedLabel = label.trimmed();
 	if(trimmedLabel.isEmpty())
@@ -83,126 +72,27 @@ void DiscordTargetManager::setTargetLabel(const QString &targetId, const QString
 	else
 		targetLabels_.insert(targetId, trimmedLabel);
 
-	DiscordTarget &target = targets_[targetId];
-	const QString newDisplayName = resolvedDisplayName(target);
-	if(target.displayName == newDisplayName)
-		return;
-
-	target.displayName = newDisplayName;
-	emit targetsChanged();
+	rebuildTargets();
 }
 
-void DiscordTargetManager::discoverTargets() {
-	QSet<QString> availableTargets;
-	for(int i = 0; i < 10; i++) {
+void DiscordTargetManager::discoverTargets(bool allowInteractiveAuth, const QString &preferredTargetId) {
+	QSet<QString> availablePipes;
+	for(int i = 0; i < 10; ++i) {
 		const QString pipeName = QStringLiteral("discord-ipc-%1").arg(i);
-		if(!probePipe(pipeName))
-			continue;
-
-		availableTargets.insert(pipeName);
-		ensureTargetExists(pipeName);
+		if(probePipe(pipeName))
+			availablePipes.insert(pipeName);
 	}
 
-	bool didTargetsChange = false;
-	bool activeSessionChanged = false;
+	for(const QString &pipeName : availablePipes)
+		ensureSessionExists(pipeName);
 
-	for(auto it = targets_.begin(), end = targets_.end(); it != end; ++it) {
-		DiscordTarget &target = it.value();
-		DiscordSession *targetSession = sessions_.value(target.id);
-		const bool isAvailable = availableTargets.contains(target.id);
-
-		if(target.isAvailable != isAvailable) {
-			target.isAvailable = isAvailable;
-			didTargetsChange = true;
-			if(target.id == activeTargetId_)
-				activeSessionChanged = true;
-		}
-
-		if(!isAvailable) {
-			if(targetSession && targetSession->isConnected())
-				targetSession->disconnect();
-
-			const QString disconnectedError = QStringLiteral("DISCONNECTED");
-			if(target.lastError != disconnectedError) {
-				target.lastError = disconnectedError;
-				didTargetsChange = true;
-			}
-			continue;
-		}
-
-		if(clientID_.isEmpty() || clientSecret_.isEmpty()) {
-			if(targetSession)
-				targetSession->disconnect();
-
-			const QString missingCredentials = QStringLiteral("ERR 0");
-			if(target.lastError != missingCredentials) {
-				target.lastError = missingCredentials;
-				didTargetsChange = true;
-			}
-			continue;
-		}
-
-		if(targetSession)
-			targetSession->ensureConnected(clientID_, clientSecret_, oauthDataPathForTarget(target.id));
-
-		const DiscordTarget previousTarget = target;
-		syncTargetFromSession(target.id);
-		if(previousTarget.displayName != target.displayName
-			|| previousTarget.cachedUser.userID != target.cachedUser.userID
-			|| previousTarget.cachedUser.username != target.cachedUser.username
-			|| previousTarget.cachedUser.avatarID != target.cachedUser.avatarID
-			|| previousTarget.isInVoiceChannel != target.isInVoiceChannel
-			|| previousTarget.lastError != target.lastError) {
-			didTargetsChange = true;
-			if(target.id == activeTargetId_)
-				activeSessionChanged = true;
-		}
-	}
-
-	updateAutoActiveTarget();
-
-	if(didTargetsChange)
-		emit targetsChanged();
-	if(activeSessionChanged)
-		emit activeSessionStateChanged();
+	syncSessionAvailability(availablePipes);
+	connectAvailableSessions(allowInteractiveAuth, preferredTargetId);
+	rebuildTargets();
 }
 
 void DiscordTargetManager::updateAutoActiveTarget() {
-	if(primaryTargetId_.isEmpty()) {
-		const QString defaultPrimaryTargetId = firstAvailableTargetId();
-		if(!defaultPrimaryTargetId.isEmpty()) {
-			primaryTargetId_ = defaultPrimaryTargetId;
-			emit primaryTargetChanged(primaryTargetId_);
-		}
-	}
-
-	QStringList voiceTargets;
-	for(auto it = targets_.cbegin(), end = targets_.cend(); it != end; ++it) {
-		if(isTargetInVoiceChannel(it.key()))
-			voiceTargets += it.key();
-	}
-
-	QString resolvedTargetId = activeTargetId_;
-	if(voiceTargets.size() == 1) {
-		resolvedTargetId = voiceTargets.first();
-	}
-	else if(voiceTargets.size() > 1) {
-		if(voiceTargets.contains(primaryTargetId_))
-			resolvedTargetId = primaryTargetId_;
-		else if(voiceTargets.contains(activeTargetId_))
-			resolvedTargetId = activeTargetId_;
-		else
-			resolvedTargetId = voiceTargets.first();
-	}
-	else if(resolvedTargetId.isEmpty()) {
-		if(isTargetConnected(primaryTargetId_) || (target(primaryTargetId_) && target(primaryTargetId_)->isAvailable))
-			resolvedTargetId = primaryTargetId_;
-		else
-			resolvedTargetId = firstAvailableTargetId();
-	}
-
-	if(!resolvedTargetId.isEmpty())
-		setActiveTargetId(resolvedTargetId);
+	rebuildTargets();
 }
 
 QList<DiscordTarget> DiscordTargetManager::targets() const {
@@ -215,11 +105,12 @@ const DiscordTarget *DiscordTargetManager::target(const QString &targetId) const
 }
 
 DiscordSession *DiscordTargetManager::session(const QString &targetId) const {
-	return sessions_.value(targetId);
+	const QString pipeName = targetToPipe_.value(targetId);
+	return pipeName.isEmpty() ? nullptr : sessions_.value(pipeName);
 }
 
 DiscordSession *DiscordTargetManager::activeSession() const {
-	return sessions_.value(activeTargetId_);
+	return session(activeTargetId_);
 }
 
 QString DiscordTargetManager::firstAvailableTargetId() const {
@@ -243,60 +134,156 @@ QString DiscordTargetManager::primaryTargetId() const {
 	return primaryTargetId_;
 }
 
-void DiscordTargetManager::ensureTargetExists(const QString &targetId) {
-	if(targets_.contains(targetId))
+QString DiscordTargetManager::persistentTargetId(const QString &targetId) const {
+	if(targetId.isEmpty())
+		return {};
+
+	if(!isTemporaryDiscordTargetId(targetId))
+		return targets_.contains(targetId) ? targetId : QString{};
+
+	if(DiscordSession *targetSession = preferredSession(targetId)) {
+		const DiscordUserSummary &user = targetSession->userSummary();
+		if(user.isValid())
+			return user.userID;
+	}
+
+	return {};
+}
+
+void DiscordTargetManager::ensureSessionExists(const QString &pipeName) {
+	if(sessions_.contains(pipeName))
 		return;
 
-	DiscordTarget target;
-	target.id = targetId;
-	target.pipeName = targetId;
-	target.displayName = targetLabels_.value(targetId, targetId);
-	targets_.insert(targetId, target);
-
-	auto *targetSession = new DiscordSession(targetId, targetId, this);
-	connect(targetSession, &DiscordSession::stateChanged, this, [this, targetId] {
-		syncTargetFromSession(targetId);
-		updateAutoActiveTarget();
-		emit targetsChanged();
-		if(targetId == activeTargetId_)
-			emit activeSessionStateChanged();
+	auto *targetSession = new DiscordSession(pipeName, this);
+	connect(targetSession, &DiscordSession::stateChanged, this, [this, targetSession] {
+		saveSessionAuth(*targetSession);
+		rebuildTargets();
 	});
-	sessions_.insert(targetId, targetSession);
+	sessions_.insert(pipeName, targetSession);
 }
 
-QString DiscordTargetManager::oauthDataPathForTarget(const QString &targetId) const {
-	const QString basePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-	QDir oauthDir(basePath);
-	oauthDir.mkpath("oauth");
-	return oauthDir.filePath(QStringLiteral("oauth/%1.json").arg(targetId));
+void DiscordTargetManager::syncSessionAvailability(const QSet<QString> &availablePipes) {
+	for(auto it = sessions_.begin(), end = sessions_.end(); it != end; ++it) {
+		if(availablePipes.contains(it.key()))
+			continue;
+
+		if(it.value()->isConnected())
+			it.value()->disconnect();
+	}
 }
 
-QString DiscordTargetManager::resolvedDisplayName(const DiscordTarget &target) const {
-	if(const QString label = targetLabels_.value(target.id).trimmed(); !label.isEmpty())
-		return label;
+void DiscordTargetManager::connectAvailableSessions(bool allowInteractiveAuth, const QString &preferredTargetId) {
+	if(clientID_.isEmpty() || clientSecret_.isEmpty()) {
+		for(auto it = sessions_.begin(), end = sessions_.end(); it != end; ++it) {
+			if(it.value()->isConnected())
+				it.value()->disconnect();
+		}
 
-	if(!target.cachedUser.username.isEmpty())
-		return target.cachedUser.username;
+		rebuildTargets();
+		return;
+	}
 
-	return target.pipeName;
-}
+	for(auto it = sessions_.begin(), end = sessions_.end(); it != end; ++it)
+		connectSession(it.value(), false);
 
-void DiscordTargetManager::syncTargetFromSession(const QString &targetId) {
-	auto it = targets_.find(targetId);
-	if(it == targets_.end())
+	if(!allowInteractiveAuth)
 		return;
 
-	DiscordTarget &target = it.value();
-	DiscordSession *targetSession = sessions_.value(targetId);
+	DiscordSession *targetSession = preferredSession(preferredTargetId);
+	if(!targetSession && !preferredTargetId.isEmpty())
+		return;
+
+	if(!targetSession)
+		targetSession = preferredSession(activeTargetId_);
+
+	if(!targetSession)
+		targetSession = preferredSession(firstAvailableTargetId());
+
 	if(!targetSession)
 		return;
 
-	if(const DiscordUserSummary user = targetSession->userSummary(); user.isValid())
-		target.cachedUser = user;
+	connectSession(targetSession, true);
+}
 
-	target.isInVoiceChannel = targetSession->isInVoiceChannel();
-	target.lastError = targetSession->connectionError();
-	target.displayName = resolvedDisplayName(target);
+void DiscordTargetManager::connectSession(DiscordSession *session, bool allowInteractiveAuth) {
+	if(!session || !probePipe(session->pipeName()))
+		return;
+
+	if(clientID_.isEmpty() || clientSecret_.isEmpty()) {
+		if(session->isConnected())
+			session->disconnect();
+		return;
+	}
+
+	if(session->ensureConnected(clientID_, clientSecret_, authStorage_.loadAllAuthData(), allowInteractiveAuth))
+		saveSessionAuth(*session);
+}
+
+void DiscordTargetManager::saveSessionAuth(const DiscordSession &session) {
+	const DiscordUserSummary &user = session.userSummary();
+	if(!user.isValid())
+		return;
+
+	authStorage_.saveAuthData(user.userID, session.oauthData());
+}
+
+void DiscordTargetManager::rebuildTargets() {
+	const QMap<QString, DiscordTarget> previousTargets = targets_;
+	const QString previousActiveTargetId = activeTargetId_;
+	const QString previousPrimaryTargetId = primaryTargetId_;
+
+	const DiscordTargetState state = buildDiscordTargetState(sessionSnapshots(), targetLabels_, activeTargetId_, primaryTargetId_);
+
+	targets_ = state.targets;
+	targetToPipe_.clear();
+	for(auto it = targets_.cbegin(), end = targets_.cend(); it != end; ++it)
+		targetToPipe_.insert(it.key(), it->pipeName);
+
+	activeTargetId_ = state.activeTargetId;
+	primaryTargetId_ = state.primaryTargetId;
+
+	if(previousTargets != targets_)
+		emit targetsChanged();
+	if(previousActiveTargetId != activeTargetId_)
+		emit activeTargetChanged(activeTargetId_);
+	if(previousPrimaryTargetId != primaryTargetId_)
+		emit primaryTargetChanged(primaryTargetId_);
+	if(previousActiveTargetId != activeTargetId_ || previousTargets != targets_)
+		emit activeSessionStateChanged();
+}
+
+QList<DiscordSessionSnapshot> DiscordTargetManager::sessionSnapshots() const {
+	QList<DiscordSessionSnapshot> snapshots;
+	snapshots.reserve(sessions_.size());
+
+	for(auto it = sessions_.cbegin(), end = sessions_.cend(); it != end; ++it) {
+		DiscordSessionSnapshot snapshot;
+		snapshot.pipeName = it.key();
+		snapshot.user = it.value()->userSummary();
+		snapshot.isAvailable = probePipe(it.key());
+		snapshot.isConnected = it.value()->isConnected();
+		snapshot.isInVoiceChannel = it.value()->isInVoiceChannel();
+		snapshot.lastError = snapshot.isAvailable
+			? (clientID_.isEmpty() || clientSecret_.isEmpty()
+				? QStringLiteral("ERR 0")
+				: it.value()->connectionError())
+			: QStringLiteral("DISCONNECTED");
+		snapshots += snapshot;
+	}
+
+	return snapshots;
+}
+
+DiscordSession *DiscordTargetManager::preferredSession(const QString &preferredTargetId) const {
+	if(preferredTargetId.isEmpty())
+		return nullptr;
+
+	if(isTemporaryDiscordTargetId(preferredTargetId)) {
+		const QString pipeName = preferredTargetId.sliced(QStringLiteral("pipe.").size());
+		return sessions_.value(pipeName);
+	}
+
+	return session(preferredTargetId);
 }
 
 bool DiscordTargetManager::probePipe(const QString &pipeName) const {

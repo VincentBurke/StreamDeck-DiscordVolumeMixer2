@@ -15,7 +15,7 @@ option(BUILD_IN_STREAMDECK_PLUGINS_DIR "Whether to build to the 'bin' directory 
 set(target streamdeck-discordmixer)
 
 # Qt setup
-find_package(Qt6 COMPONENTS Core WebSockets Network Gui REQUIRED CONFIG)
+find_package(Qt6 COMPONENTS Core WebSockets Network Gui Test REQUIRED CONFIG)
 set(CMAKE_AUTOMOC ON)
 
 if (BUILD_IN_STREAMDECK_PLUGINS_DIR)
@@ -67,3 +67,17 @@ install(CODE "set(QMAKE_FILEPATH \"${QMAKE_FILEPATH}\")")
 install(CODE "set(PROJECT_SOURCE_DIR \"${PROJECT_BASE_DIR}\")")
 install(CODE "set(CMAKE_BINARY_DIR \"${CMAKE_BASE_DIR}\")")
 install(SCRIPT "${PROJECT_SOURCE_DIR}/deploy.cmake")
+
+# ===========================================
+# Tests
+# ===========================================
+enable_testing()
+
+qt_add_executable(streamdeck-discordmixer-tests
+    tests/discord_identity_tests.cpp
+    src/discord/discordauthstorage.cpp
+    src/discord/discordtargetstate.cpp
+)
+target_link_libraries(streamdeck-discordmixer-tests PRIVATE Qt6::Core Qt6::Test)
+target_include_directories(streamdeck-discordmixer-tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
+add_test(NAME streamdeck-discordmixer-tests COMMAND streamdeck-discordmixer-tests)

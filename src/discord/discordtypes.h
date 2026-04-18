@@ -10,6 +10,8 @@ struct DiscordUserSummary {
 	inline bool isValid() const {
 		return !userID.isEmpty();
 	}
+
+	bool operator==(const DiscordUserSummary &) const = default;
 };
 
 struct DiscordTarget {
@@ -20,4 +22,6 @@ struct DiscordTarget {
 	bool isAvailable = false;
 	bool isInVoiceChannel = false;
 	QString lastError;
+
+	bool operator==(const DiscordTarget &) const = default;
 };

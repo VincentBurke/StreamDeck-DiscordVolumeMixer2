@@ -46,6 +46,11 @@ This is a plugin for Stream Deck for managing Discord Voice chats:
 	* Triple check the configuration in the Discord Developer Portal.
 	* Turn off both Discord and Stream Deck software. Then turn on Discord. After it fully loads, turn on Stream Deck.
 
+* `AUTH REQUIRED`:
+	* The discovered Discord client has not been authorized for this plugin yet.
+	* Open the mixer or explicitly select that target once to approve it.
+	* DVM now keeps auth per Discord account, so you should only need to do this once after installing the fix.
+
 * Avatars are not visible, otherwise everything works.
 	* Update the Stream Deck software.
 
@@ -77,6 +82,7 @@ This is a plugin for Stream Deck for managing Discord Voice chats:
 	* Optionally rename each discovered target, for example `Main / Stable` and `Alt / Canary`.
 	* Choose whether that button follows the global active target or pins a specific target.
 13. Click on the Discord Volume Mixer button. Discord will ask each target to authorize separately the first time it is used.
+	* After a target is authorized, DVM should reuse that authorization across restarts even if Discord clients launch in a different order.
 14. Optionally add the `Switch active target` action to your deck if you want to cycle targets directly from the hardware.
 15. Done.
 

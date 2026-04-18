@@ -13,15 +13,15 @@ class DiscordSession : public QObject {
 Q_OBJECT
 
 public:
-	DiscordSession(const QString &targetId, const QString &pipeName, QObject *parent = nullptr);
+	explicit DiscordSession(const QString &pipeName, QObject *parent = nullptr);
 
 public:
-	bool ensureConnected(const QString &clientID, const QString &clientSecret, const QString &oauthDataPath);
+	bool ensureConnected(
+		const QString &clientID,
+		const QString &clientSecret,
+		const QList<QJsonObject> &authCandidates,
+		bool allowInteractiveAuth);
 	void disconnect();
-
-	inline const QString &targetId() const {
-		return targetId_;
-	}
 
 	inline const QString &pipeName() const {
 		return pipeName_;
@@ -37,6 +37,10 @@ public:
 
 	inline const DiscordUserSummary &userSummary() const {
 		return userSummary_;
+	}
+
+	inline const QJsonObject &oauthData() const {
+		return discord_.oauthData();
 	}
 
 	inline const QString &currentVoiceChannelID() const {
@@ -87,7 +91,6 @@ private slots:
 	void onDiscordMessageReceived(const QDiscordMessage &msg);
 
 private:
-	const QString targetId_;
 	const QString pipeName_;
 	QDiscord discord_;
 	DiscordUserSummary userSummary_;

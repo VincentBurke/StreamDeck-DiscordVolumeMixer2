@@ -18,7 +18,7 @@ public:
 
 public slots:
 	/// Attempts to discover targets and connect the active one.
-	void connectToDiscord();
+	void connectToDiscord(bool allowInteractiveAuth = false, const QString &preferredTargetId = {});
 
 	/// Reloads channel member data for the active target.
 	void updateChannelMembersData();
@@ -35,6 +35,7 @@ public:
 	void setTargetDisplayName(const QString &targetId, const QString &label);
 	QString targetLabel(const QString &targetId) const;
 	QString targetDisplayName(const QString &targetId) const;
+	QString authorizeTarget(const QString &targetId);
 	QString resolveMixerTarget(const QString &pinnedTargetId, bool usePinnedTarget);
 	QString activeConnectionError() const;
 	bool isDiscordConnected() const;

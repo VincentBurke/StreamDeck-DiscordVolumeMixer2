@@ -22,6 +22,13 @@ QString targetLabel(const DiscordTarget &target) {
 	label += QStringLiteral(" (%1)").arg(target.pipeName);
 	return label;
 }
+
+QString displayTargetId(const QString &targetId, DVMPlugin *plugin) {
+	if(isTemporaryDiscordTargetId(targetId))
+		return plugin->authorizeTarget(targetId);
+
+	return targetId;
+}
 }
 
 Action_SwitchTarget::Action_SwitchTarget() {
@@ -83,8 +90,12 @@ void Action_SwitchTarget::buildPropertyInspector(QStreamDeckPropertyInspectorBui
 		targetCombo.setValue(qMax(targetIndexForId(targets, setting("switchTargetId").toString()), 0));
 		targetCombo.addValueChangedCallback([action = this, targets](const QVariant &value) {
 			const int index = value.toInt();
-			if(index >= 0 && index < targets.size())
-				action->setSetting("switchTargetId", targets[index].id);
+			if(index < 0 || index >= targets.size())
+				return;
+
+			const QString persistentTargetId = displayTargetId(targets[index].id, action->plugin());
+			if(!persistentTargetId.isEmpty())
+				action->setSetting("switchTargetId", persistentTargetId);
 		});
 	}
 
@@ -112,7 +123,7 @@ void Action_SwitchTarget::onPressed() {
 	const QList<DiscordTarget> targets = plugin()->targets();
 
 	if(targets.isEmpty()) {
-		plugin()->connectToDiscord();
+		plugin()->connectToDiscord(true);
 		return;
 	}
 
@@ -128,7 +139,7 @@ void Action_SwitchTarget::onPressed() {
 		}
 
 		if(availableTargets.isEmpty()) {
-			plugin()->connectToDiscord();
+			plugin()->connectToDiscord(true);
 			return;
 		}
 
@@ -144,7 +155,11 @@ void Action_SwitchTarget::onPressed() {
 	if(nextTargetId.isEmpty())
 		return;
 
-	plugin()->setActiveTarget(nextTargetId);
-	plugin()->connectToDiscord();
+	if(const QString persistentTargetId = plugin()->authorizeTarget(nextTargetId); !persistentTargetId.isEmpty())
+		plugin()->setActiveTarget(persistentTargetId);
+	else {
+		plugin()->setActiveTarget(nextTargetId);
+		plugin()->connectToDiscord(true, nextTargetId);
+	}
 	plugin()->updateChannelMembersData();
 }
